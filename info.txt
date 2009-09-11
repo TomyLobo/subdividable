@@ -1,0 +1,10 @@
+"AddonInfo"
+{
+	"name"				"Subdividable cube"
+	"version"			""
+	"up_date"			""
+	"author_name"			"TomyLobo"
+	"author_email"			""
+	"author_url"			""
+	"info"				"A cube you can shoot to pieces."
+}
