@@ -1,7 +1,6 @@
-AddCSLuaFile( "cl_init.lua" ) -- Make sure clientside
-AddCSLuaFile( "shared.lua" ) -- and shared scripts are sent.
+AddCSLuaFile( "cl_init.lua" ) -- Make sure clientside scripts are sent.
 
-include('shared.lua')
+include('cl_init.lua') -- include the shared part of the client-side script
 
 local subdividable_minsize = CreateConVar("subdividable_minsize", 3)
 
@@ -15,6 +14,7 @@ local models = {
 }
 
 local subdiv_registry = {}
+local controllers = {}
 local last_subdiv_id = 0
 
 local function delete_subdiv(undodata, subdiv_id)
@@ -22,6 +22,20 @@ local function delete_subdiv(undodata, subdiv_id)
 	for ent,_ in pairs(subdiv_registry[subdiv_id]) do
 		ent:Remove()
 	end
+	if controllers[subdiv_id] then controllers[subdiv_id]:Remove() end
+end
+
+local function MakeSubdivController()
+	ctrl = ents.Create("subdiv_controller")
+	ctrl:SetModel("models/props_junk/watermelon01.mdl")
+	ctrl:SetNoDraw(true)
+	ctrl:SetNotSolid(true)
+	--ctrl:Spawn()
+	ctrl:PhysicsInit(SOLID_VPHYSICS)
+	--ctrl:SetMoveType(MOVETYPE_VPHYSICS)
+	ctrl:SetSolid(SOLID_NONE)
+	
+	return ctrl
 end
 
 local function MakeSubdividable(ply, Data, size, subdiv_id)
@@ -46,9 +60,14 @@ local function MakeSubdividable(ply, Data, size, subdiv_id)
 	ent.size = size
 	
 	ent.subdiv_id = subdiv_id
-	if not subdiv_registry[subdiv_id] then
+	local ctrl
+	if subdiv_registry[subdiv_id] then
+		ctrl = controllers[subdiv_id]
+	else
 		subdiv_registry[subdiv_id] = {}
-		print("undo create")
+		ctrl = MakeSubdivController()
+		controllers[subdiv_id] = ctrl
+		
 		undo.Create("Subdividable")
 			undo.SetPlayer( ply )
 			undo.AddFunction(delete_subdiv, subdiv_id)
@@ -61,12 +80,19 @@ end
 
 function ENT:OnRemove()
 	subdiv_registry[self.subdiv_id][self.Entity] = nil
-	if not next(subdiv_registry[self.subdiv_id]) then -- no more entries for this id? remove id from table
+	
+	-- no more entries for this id?
+	if not next(subdiv_registry[self.subdiv_id]) then
+		-- Remove the controller
+		controllers[self.subdiv_id]:Remove()
+		controllers[self.subdiv_id] = nil
+		-- Remove the id from the table
 		subdiv_registry[self.subdiv_id] = nil
 	end
 end
 
-duplicator.RegisterEntityClass("subdividable", MakeSubdividable, "Data", "size")
+duplicator.RegisterEntityClass("subdividable", MakeProp, "Pos", "Ang", "Model", "PhysicsObjects", "Data")
+duplicator.RegisterEntityClass("subdiv_controller", MakeSubdivController)
 
 function ENT:SpawnFunction( ply, trace )
 	if (not trace.Hit) then return end
